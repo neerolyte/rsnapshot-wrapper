@@ -7,8 +7,11 @@ The standard rsnapshot cron configuration is actually quite unsafe, it will dele
 This wrapper sits around rsnapshot and solves those two problems, plus it lets you run the script from cron a lot more often with no additional overhead.
 
 ## Cron file /etc/cron.d/backups 
+
 	PATH=/bin:/sbin:/usr/bin:/usr/sbin
 	17 */3 * * * root /etc/rsnapshot/run_rsnapshot
+
+run_rsnapshot attempts to be a "well behaved" unix cron script in that it will only echo text out to cron if there's a problem. So this will send me an email whenever anything goes wrong.
 
 ## Manually running
 
