@@ -1,0 +1,8 @@
+last_success.d
+.*.swp
+conf.d/*.conf
+drive_config
+id_rsa
+id_rsa.pub
+luks.key
+scripts

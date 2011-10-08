@@ -1,0 +1,19 @@
+# currently only mounting luks crypted drives by its uuid is implemented
+
+backup_mount="/mnt/rsnapshot"
+
+# UUIDs of luks encrypted devices
+uuids_crypted=(
+	"2570af82-8c38-42b3-82aa-e8c1e30f1f73" # 1TB USB Seagate mid sized portable - labelled as disk 4
+	"907729e3-fbdf-4a3a-a0eb-b0f32e59b571" # 320 GB WD portable - labelled as disk 3
+)
+
+# devices actually passed in to mount
+devs=()
+
+# Crypted uuids are automatically decrypted as backup-<uuid>
+for uuid in "${uuids_crypted[@]}"; do
+	devs+=("/dev/mapper/backup-$uuid")
+done
+
+# vim: ft=sh

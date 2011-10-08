@@ -1,0 +1,124 @@
+#!/bin/bash
+
+cd "$(dirname "$0")"
+
+config_file="$1"
+success_file=last_success.d/"$(basename "$config_file")"
+tty -s && in_cron=0 || in_cron=1
+backup_name="$(basename "$config_file" | sed 's/.conf$//')"
+
+if [[ -z "$config_file" ]]; then
+	echo "ERROR: supply the rsnapshot config file as first arg"
+	exit 1
+fi
+
+root="$(grep ^snapshot_root "$config_file" | sed -r 's/^snapshot_root\s+//g')"
+
+log() {
+	# if not in cron
+	if [[ $in_cron = 0 ]]; then
+		echo "($backup_name) $*"
+	else
+		logger -t rsnapshot_runner "($config_file) $*"
+	fi
+}
+
+check_time=$(egrep '^# runner-check: (.*)$' "$config_file" | sed -r 's/.*runner-check: //g')
+interval_names=($(egrep '^# runner-interval-names: (.*)$' "$config_file" | sed -r 's/.*runner-interval-names: //g'))
+interval_seconds=($(egrep '^# runner-interval-seconds: (.*)$' "$config_file" | sed -r 's/.*runner-interval-seconds: //g'))
+egrep -q '^sync_first(.*)1$' "$config_file" && sync_first=1 || sync_first=0
+
+# get the name of the next interval time period from a current name
+get_next_interval() {
+	next=0
+	for name in "${interval_names[@]}"; do
+		if [[ $next = 1 ]]; then
+			echo "$name"
+			return
+		fi
+		if [[ $name = $1 ]]; then
+			next=1
+		fi
+	done
+} # end get_next_interval()
+
+# get representation of internval in seconds
+get_interval_seconds() {
+	local i=0
+	for name in "${interval_names[@]}"; do
+		if [[ $name = $1 ]]; then
+			echo "${interval_seconds[$i]}"
+			return
+		fi
+		i=$[i+1]
+	done
+} # end get_interval_seconds()
+
+# rotate through the various intervals
+rotate() {
+	while read -r ignore interval keep; do
+		# if we have enough to rotate
+		if [[ -d $root$interval.$[$keep-1] ]]; then
+			#log "have enough $interval to rotate, checking for next period"
+			next=$(get_next_interval $interval)
+			if [[ ! -z $next ]]; then
+				next_dir="$root$next.0"
+				should_rotate=0
+				if [[ ! -d "$next_dir" ]]; then
+					log "rotating $next because $next_dir missing"
+					rsnapshot_cmd "$next"
+				else
+					next_mtime="$(date +%s --reference="$next_dir")"
+					next_mgap=$[$(date +%s)-$next_mtime]
+					next_mgap_wanted=$(get_interval_seconds "$next")
+					if [[ $next_mgap -ge $next_mgap_wanted ]]; then
+						log "Rotating $next because $next.0 is old ($next_mgap seconds, want $next_mgap_wanted)"
+						rsnapshot_cmd "$next"
+					fi
+				fi
+			fi
+		fi
+	done < <(grep ^interval "$config_file")
+} # end rotate()
+
+# check if last valid snapshot older than defined runner-check time
+fresh() {
+	if [[ ! -f $success_file ]]; then
+		return 1
+	fi
+	last_mtime=$(date +%s --reference="$success_file")
+	last_gap=$(($(date +%s)-$last_mtime))
+	if [[ $last_gap -ge $check_time ]]; then
+		return 1
+	fi
+} # end fresh()
+
+# execute a single rsnapshot command
+rsnapshot_cmd() {
+	perl rsnapshot.pl -c "$config_file" "$@"
+	return $?
+}
+
+# run rsnapshot with whatever the smallest defined period is
+take_snapshot() {
+	log "Taking a snapshot"
+	if [[ $sync_first = 1 ]]; then
+		rsnapshot_cmd sync && rsnapshot_cmd "${interval_names[0]}"
+		status=$?
+	else
+		rsnapshot_cmd "${interval_names[0]}"
+		status=$?
+	fi
+	if [[ $status = 0 ]]; then
+		log "Snapshot succeeded"
+		touch "$success_file"
+	else
+		log "Snapshot failed"
+	fi
+} # end take_snapshot()
+
+if ! fresh; then
+	rotate
+	take_snapshot
+	sync
+fi

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+cd "$(dirname "$0")"
+
+./drive_manager_open
+
+for conf in conf.d/*.conf; do
+	./run_rsnapshot_one "$conf"
+   #	2>&1 | logger -t rsnapshot_runner
+done

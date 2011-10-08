@@ -1,0 +1,19 @@
+#!/bin/bash
+
+source "$(dirname "$0")/drive_config"
+
+sync
+umount "$backup_mount"
+sync
+
+for uuid in "${uuids_crypted[@]}"; do
+	dev="/dev/mapper/backup-$uuid"
+	if [[ -b $dev ]]; then
+		echo "Closing drive id $uuid"
+		sync
+		cryptsetup luksClose "$dev"
+		# just in case luksClose doesn't work - sometimes happens, not sure why
+		[[ -b $dev ]] && dmsetup remove "$dev"
+		sync
+	fi
+done

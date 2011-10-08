@@ -1,0 +1,45 @@
+#!/bin/bash -e
+
+source "$(dirname "$0")/drive_config"
+etc="$(dirname "$0")"
+
+error() {
+	echo "ERROR: $*"
+	exit 1
+}
+
+for uuid in "${uuids_crypted[@]}"; do
+	#echo Trying "$uuid" ...
+	if [[ -b /dev/disk/by-uuid/$uuid ]] && [[ ! -b /dev/mapper/backup-$uuid ]]; then
+		echo "Opening drive id $uuid"
+		cryptsetup luksOpen \
+			--key-file "$etc/luks.key" \
+			/dev/disk/by-uuid/"$uuid" backup-"$uuid"
+	fi
+done
+
+found_dev=0
+
+for dev in "${devs[@]}"; do
+	if [[ -b $dev ]]; then
+		mkdir -p "$backup_mount"
+		found_dev=1
+		break
+	fi
+done
+
+if [[ $found_dev = 0 ]]; then
+	echo "ERROR: Couldn't find usable backup device"
+	exit 1
+fi
+
+[[ -z $dev ]] && error "Could not find any usable drive, is it plugged in?"
+mount -l | fgrep -q "$dev on $backup_mount" || {
+	mount -l | egrep -q " $backup_mount " && {
+		umount "$backup_mount" || error "Mount point appears to already be in use and I couldn't umount it"
+	}
+	mount -l | egrep -q "^$dev " && {
+		umount "$dev" || error "Drive already mounted and I couldn't umount it"
+	}
+	mount "$dev" "$backup_mount" || error "Failed to mount drive '$dev' to '$backup_mount'"
+}
