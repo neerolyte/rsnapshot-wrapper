@@ -9,3 +9,17 @@ This wrapper sits around rsnapshot and solves those two problems, plus it lets y
 ## Cron file /etc/cron.d/backups 
 	PATH=/bin:/sbin:/usr/bin:/usr/sbin
 	17 */3 * * * root /etc/rsnapshot/run_rsnapshot
+
+## Manually running
+
+In this example I run the mythtv backup found in conf.d.examples/mythtv.conf manually.
+
+My backups are currently recent enough, so I remove the success files:
+	root@drudge:/etc/rsnapshot# rm last_success.d/mythtv.conf
+
+I then just run the main wrapper:
+	root@drudge:/etc/rsnapshot# ./run_rsnapshot
+	(mythtv) Taking a snapshot
+	(mythtv) Snapshot succeeded
+
+Done.
