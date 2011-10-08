@@ -1,4 +1,4 @@
-# rsnapshot-runner
+# Rsnapshot Wrapper
 
 ## About
 
