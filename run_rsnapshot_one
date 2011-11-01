@@ -109,6 +109,9 @@ take_snapshot() {
 		rsnapshot_cmd "${interval_names[0]}"
 		status=$?
 	fi
+
+	du -sh "${root}"* > "${root}du.out"
+
 	if [[ $status = 0 ]]; then
 		log "Snapshot succeeded"
 		touch "$success_file"
